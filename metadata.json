@@ -1,0 +1,6 @@
+{
+  "name": "ANSH AI",
+  "description": "Intelligence Without Limits — AI assistant with Gemini chat, multimodal vision, voice chat, image studio, web search, and admin governance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

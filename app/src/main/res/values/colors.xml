@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ansh_bg">#080910</color>
+    <color name="ansh_surface">#151522</color>
+    <color name="ansh_electric_blue">#1677FF</color>
+    <color name="ansh_purple">#9B4DFF</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

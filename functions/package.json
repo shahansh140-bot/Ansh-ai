@@ -1,0 +1,17 @@
+{
+  "name": "ansh-ai-video-proxy",
+  "description": "Secure Firebase Cloud Functions proxy for ANSH AI video generation using Gemini Interactions API (gemini-omni-1.2-flash)",
+  "version": "1.0.0",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

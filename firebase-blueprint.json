@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated ANSH AI user profile, role, usage counters, and preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "Optional profile avatar URL" },
+        "status": { "type": "string", "enum": ["ACTIVE", "DISABLED"] },
+        "role": { "type": "string", "enum": ["USER", "SUPER_ADMIN"] },
+        "dailyRequestCount": { "type": "integer" },
+        "totalRequests": { "type": "integer" },
+        "lastRequestDate": { "type": "string" },
+        "preferredLanguage": { "type": "string" },
+        "themeMode": { "type": "string", "enum": ["ELECTRIC_DARK", "OLED_BLACK", "MIDNIGHT_INDIGO"] },
+        "voiceSpeechRate": { "type": "number" },
+        "voiceAutoSpeak": { "type": "boolean" },
+        "autoSaveHistory": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": [
+        "userId", "displayName", "email", "status", "role",
+        "dailyRequestCount", "totalRequests", "lastRequestDate",
+        "preferredLanguage", "themeMode", "voiceSpeechRate",
+        "voiceAutoSpeak", "autoSaveHistory", "createdAt", "updatedAt"
+      ]
+    },
+    "ChatThread": {
+      "title": "ChatThread",
+      "description": "A user-owned AI conversation thread.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "mode": { "type": "string", "enum": ["CHAT", "SEARCH", "MATH", "CODE", "VOICE"] },
+        "modelName": { "type": "string" },
+        "lastMessagePreview": { "type": "string" },
+        "messageCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "mode", "modelName", "lastMessagePreview", "messageCount", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message inside a user's conversation thread.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "chatId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "text": { "type": "string" },
+        "hasImage": { "type": "boolean" },
+        "citationTitles": { "type": "array" },
+        "citationUrls": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "chatId", "role", "text", "hasImage", "citationTitles", "citationUrls", "createdAt"]
+    },
+    "ImageCreationLog": {
+      "title": "ImageCreationLog",
+      "description": "Metadata for an image generation attempt stored in the user's workspace.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "aspectRatio": { "type": "string" },
+        "modelName": { "type": "string" },
+        "localFilePath": { "type": "string" },
+        "status": { "type": "string", "enum": ["SUCCESS", "ERROR"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "prompt", "aspectRatio", "modelName", "localFilePath", "status", "createdAt"]
+    },
+    "VideoCreationLog": {
+      "title": "VideoCreationLog",
+      "description": "Metadata for an AI video generation or extension attempt stored in the user's workspace.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "mode": { "type": "string", "enum": ["TEXT_TO_VIDEO", "IMAGE_TO_VIDEO", "EXTEND"] },
+        "style": { "type": "string" },
+        "aspectRatio": { "type": "string" },
+        "duration": { "type": "string" },
+        "modelName": { "type": "string" },
+        "interactionId": { "type": "string" },
+        "localFilePath": { "type": "string" },
+        "status": { "type": "string", "enum": ["SUCCESS", "ERROR"] },
+        "errorMessage": { "type": "string" },
+        "actualDurationMs": { "type": "integer" },
+        "parentInteractionId": { "type": "string" },
+        "segmentCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId", "prompt", "mode", "style", "aspectRatio", "duration",
+        "modelName", "interactionId", "localFilePath", "status", "errorMessage", "createdAt"
+      ]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted Super Admin registry entry.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "AppConfig": {
+      "title": "AppConfig",
+      "description": "Global application limits and feature availability configured by Super Admin.",
+      "type": "object",
+      "properties": {
+        "dailyRequestLimit": { "type": "integer" },
+        "chatEnabled": { "type": "boolean" },
+        "voiceEnabled": { "type": "boolean" },
+        "imageGenEnabled": { "type": "boolean" },
+        "webSearchEnabled": { "type": "boolean" },
+        "videoGenEnabled": { "type": "boolean" },
+        "videoBackendUrl": { "type": "string" },
+        "maintenanceMessage": { "type": "string" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "dailyRequestLimit", "chatEnabled", "voiceEnabled",
+        "imageGenEnabled", "webSearchEnabled", "videoGenEnabled",
+        "videoBackendUrl", "maintenanceMessage", "updatedBy", "updatedAt"
+      ]
+    },
+    "SystemErrorLog": {
+      "title": "SystemErrorLog",
+      "description": "Structured client/AI error record visible to Super Admin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "feature": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "feature", "message", "createdAt"]
+    },
+    "AiRequestMetric": {
+      "title": "AiRequestMetric",
+      "description": "Telemetry event for Super Admin AI usage statistics.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "feature": { "type": "string", "enum": ["CHAT", "VOICE", "IMAGE", "VIDEO", "SEARCH", "MATH", "CODE"] },
+        "modelName": { "type": "string" },
+        "success": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "feature", "modelName", "success", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles, preferences, account status, and usage counters."
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/ChatThread" },
+      "description": "Private user-scoped chat threads."
+    },
+    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages belonging to a user's private chat thread."
+    },
+    "/users/{userId}/imageLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ImageCreationLog" },
+      "description": "User-scoped image generation prompt and file history."
+    },
+    "/users/{userId}/videoLogs/{logId}": {
+      "schema": { "$ref": "#/entities/VideoCreationLog" },
+      "description": "User-scoped AI video generation prompt, status, and MP4 history."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted Super Admin anchor collection."
+    },
+    "/app_config/{configId}": {
+      "schema": { "$ref": "#/entities/AppConfig" },
+      "description": "Global feature toggles and daily request limits managed by Super Admin."
+    },
+    "/system_errors/{errorId}": {
+      "schema": { "$ref": "#/entities/SystemErrorLog" },
+      "description": "Error logs viewable by Super Admin."
+    },
+    "/telemetry_events/{eventId}": {
+      "schema": { "$ref": "#/entities/AiRequestMetric" },
+      "description": "AI request telemetry viewable by Super Admin."
+    }
+  }
+}

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ANSH AI</string>
+    <string name="video_backend_url" translatable="false"></string>
+</resources>

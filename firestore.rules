@@ -1,0 +1,367 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened helper primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    function isOwnerVerifiedEmail() {
+      return isSignedIn() &&
+        'email' in request.auth.token &&
+        request.auth.token.email == 'shahansh140@gmail.com' &&
+        'email_verified' in request.auth.token &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        isOwnerVerifiedEmail() ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.email == 'shahansh140@gmail.com')
+      );
+    }
+
+    // Schema validators
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.email is string && data.email.size() <= 120 &&
+        (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+        data.status in ['ACTIVE', 'DISABLED'] &&
+        data.role in ['USER', 'SUPER_ADMIN'] &&
+        data.dailyRequestCount is int && data.dailyRequestCount >= 0 && data.dailyRequestCount <= 100000 &&
+        data.totalRequests is int && data.totalRequests >= 0 && data.totalRequests <= 10000000 &&
+        data.lastRequestDate is string && data.lastRequestDate.size() <= 20 &&
+        data.preferredLanguage is string && data.preferredLanguage.size() >= 1 && data.preferredLanguage.size() <= 30 &&
+        data.themeMode in ['ELECTRIC_DARK', 'OLED_BLACK', 'MIDNIGHT_INDIGO'] &&
+        (data.voiceSpeechRate is float || data.voiceSpeechRate is int) &&
+        data.voiceSpeechRate >= 0.5 && data.voiceSpeechRate <= 2.0 &&
+        data.voiceAutoSpeak is bool &&
+        data.autoSaveHistory is bool;
+    }
+
+    function isValidChatThread(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.mode in ['CHAT', 'SEARCH', 'MATH', 'CODE', 'VOICE'] &&
+        data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 60 &&
+        data.lastMessagePreview is string && data.lastMessagePreview.size() <= 300 &&
+        data.messageCount is int && data.messageCount >= 0 && data.messageCount <= 10000;
+    }
+
+    function isValidChatMessage(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.chatId is string && data.chatId.size() >= 1 && data.chatId.size() <= 128 &&
+        data.role in ['user', 'model'] &&
+        data.text is string && data.text.size() <= 50000 &&
+        data.hasImage is bool &&
+        data.citationTitles is list && data.citationTitles.size() <= 15 &&
+        (data.citationTitles.size() == 0 || data.citationTitles[0] is string) &&
+        data.citationUrls is list && data.citationUrls.size() <= 15 &&
+        (data.citationUrls.size() == 0 || data.citationUrls[0] is string);
+    }
+
+    function isValidImageCreationLog(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.prompt is string && data.prompt.size() >= 1 && data.prompt.size() <= 1000 &&
+        data.aspectRatio is string && data.aspectRatio.size() >= 1 && data.aspectRatio.size() <= 20 &&
+        data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 60 &&
+        data.localFilePath is string && data.localFilePath.size() <= 500 &&
+        data.status in ['SUCCESS', 'ERROR'];
+    }
+
+    function isValidVideoCreationLog(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.prompt is string && data.prompt.size() >= 1 && data.prompt.size() <= 1000 &&
+        data.mode in ['TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'EXTEND'] &&
+        data.style is string && data.style.size() >= 1 && data.style.size() <= 40 &&
+        data.aspectRatio is string && data.aspectRatio.size() >= 1 && data.aspectRatio.size() <= 20 &&
+        data.duration is string && data.duration.size() >= 1 && data.duration.size() <= 20 &&
+        data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 60 &&
+        data.interactionId is string && data.interactionId.size() <= 200 &&
+        data.localFilePath is string && data.localFilePath.size() <= 500 &&
+        data.status in ['SUCCESS', 'ERROR'] &&
+        data.errorMessage is string && data.errorMessage.size() <= 1000 &&
+        (!('actualDurationMs' in data) || (data.actualDurationMs is int && data.actualDurationMs >= 0 && data.actualDurationMs <= 600000)) &&
+        (!('parentInteractionId' in data) || (data.parentInteractionId is string && data.parentInteractionId.size() <= 200)) &&
+        (!('segmentCount' in data) || (data.segmentCount is int && data.segmentCount >= 1 && data.segmentCount <= 20));
+    }
+
+    function isValidAppConfig(data) {
+      return data.dailyRequestLimit is int && data.dailyRequestLimit >= 1 && data.dailyRequestLimit <= 10000 &&
+        data.chatEnabled is bool &&
+        data.voiceEnabled is bool &&
+        data.imageGenEnabled is bool &&
+        data.webSearchEnabled is bool &&
+        data.videoGenEnabled is bool &&
+        (!('videoBackendUrl' in data) || (data.videoBackendUrl is string && data.videoBackendUrl.size() <= 500)) &&
+        data.maintenanceMessage is string && data.maintenanceMessage.size() <= 300 &&
+        data.updatedBy is string && data.updatedBy.size() <= 128;
+    }
+
+    function isValidSystemError(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.feature is string && data.feature.size() >= 1 && data.feature.size() <= 60 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 1000;
+    }
+
+    function isValidTelemetryEvent(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.feature in ['CHAT', 'VOICE', 'IMAGE', 'VIDEO', 'SEARCH', 'MATH', 'CODE'] &&
+        data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 60 &&
+        data.success is bool;
+    }
+
+    // 1. User Profiles & Private Subcollections
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'ACTIVE' &&
+        (incoming().role == 'USER' || (incoming().role == 'SUPER_ADMIN' && isOwnerVerifiedEmail())) &&
+        incoming().keys().hasAll([
+          'userId', 'displayName', 'email', 'status', 'role',
+          'dailyRequestCount', 'totalRequests', 'lastRequestDate',
+          'preferredLanguage', 'themeMode', 'voiceSpeechRate',
+          'voiceAutoSpeak', 'autoSaveHistory', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'userId', 'displayName', 'email', 'photoUrl', 'status', 'role',
+          'dailyRequestCount', 'totalRequests', 'lastRequestDate',
+          'preferredLanguage', 'themeMode', 'voiceSpeechRate',
+          'voiceAutoSpeak', 'autoSaveHistory', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time && (
+          // Tier 1: Super Admin account status governance
+          (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+          // Verified owner can sync their own role to SUPER_ADMIN if profile predated bootstrap
+          (isOwnerVerifiedEmail() && request.auth.uid == userId && incoming().role == 'SUPER_ADMIN' && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt'])) ||
+          // Non-owner with a stale SUPER_ADMIN role can safely demote own profile back to USER
+          (!isOwnerVerifiedEmail() && request.auth.uid == userId && existing().role == 'SUPER_ADMIN' && incoming().role == 'USER' && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt'])) ||
+          // Tier 2: Owner updates own profile/preferences/counters without changing role or status
+          (request.auth.uid == userId &&
+           incoming().status == existing().status &&
+           incoming().role == existing().role &&
+           incoming().diff(existing()).affectedKeys().hasOnly([
+             'displayName', 'email', 'photoUrl', 'dailyRequestCount', 'totalRequests',
+             'lastRequestDate', 'preferredLanguage', 'themeMode', 'voiceSpeechRate',
+             'voiceAutoSpeak', 'autoSaveHistory', 'updatedAt'
+           ]))
+        );
+
+      allow delete: if isSuperAdmin() && isValidId(userId);
+
+      // Private user-scoped chat threads
+      match /chats/{chatId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(chatId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+          isValidId(userId) &&
+          isValidId(chatId) &&
+          request.auth.uid == userId &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll([
+            'userId', 'title', 'mode', 'modelName',
+            'lastMessagePreview', 'messageCount', 'createdAt', 'updatedAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'title', 'mode', 'modelName',
+            'lastMessagePreview', 'messageCount', 'createdAt', 'updatedAt'
+          ]) &&
+          isValidChatThread(incoming()) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+        allow update: if isSignedIn() &&
+          isValidId(userId) &&
+          isValidId(chatId) &&
+          request.auth.uid == userId &&
+          isValidChatThread(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'mode', 'modelName', 'lastMessagePreview', 'messageCount', 'updatedAt'
+          ]);
+
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(chatId) && request.auth.uid == userId;
+
+        // Private messages within a chat thread
+        match /messages/{messageId} {
+          allow get: if isSignedIn() && isValidId(userId) && isValidId(chatId) && isValidId(messageId) && request.auth.uid == userId;
+          allow list: if isSignedIn() && isValidId(userId) && isValidId(chatId) && request.auth.uid == userId;
+
+          allow create: if isSignedIn() &&
+            isValidId(userId) &&
+            isValidId(chatId) &&
+            isValidId(messageId) &&
+            request.auth.uid == userId &&
+            incoming().userId == request.auth.uid &&
+            incoming().chatId == chatId &&
+            existsAfter(/databases/$(database)/documents/users/$(userId)/chats/$(chatId)) &&
+            incoming().keys().hasAll([
+              'userId', 'chatId', 'role', 'text', 'hasImage',
+              'citationTitles', 'citationUrls', 'createdAt'
+            ]) &&
+            incoming().keys().hasOnly([
+              'userId', 'chatId', 'role', 'text', 'hasImage',
+              'citationTitles', 'citationUrls', 'createdAt'
+            ]) &&
+            isValidChatMessage(incoming()) &&
+            incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+
+          allow update: if false;
+          allow delete: if isSignedIn() && isValidId(userId) && isValidId(chatId) && isValidId(messageId) && request.auth.uid == userId;
+        }
+      }
+
+      // Private image generation history
+      match /imageLogs/{logId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(logId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+          isValidId(userId) &&
+          isValidId(logId) &&
+          request.auth.uid == userId &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll([
+            'userId', 'prompt', 'aspectRatio', 'modelName', 'localFilePath', 'status', 'createdAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'prompt', 'aspectRatio', 'modelName', 'localFilePath', 'status', 'createdAt'
+          ]) &&
+          isValidImageCreationLog(incoming()) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(logId) && request.auth.uid == userId;
+      }
+
+      // Private video generation history
+      match /videoLogs/{logId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(logId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+          isValidId(userId) &&
+          isValidId(logId) &&
+          request.auth.uid == userId &&
+          incoming().userId == request.auth.uid &&
+          incoming().keys().hasAll([
+            'userId', 'prompt', 'mode', 'style', 'aspectRatio', 'duration',
+            'modelName', 'interactionId', 'localFilePath', 'status', 'errorMessage', 'createdAt'
+          ]) &&
+          incoming().keys().hasOnly([
+            'userId', 'prompt', 'mode', 'style', 'aspectRatio', 'duration',
+            'modelName', 'interactionId', 'localFilePath', 'status', 'errorMessage',
+            'actualDurationMs', 'parentInteractionId', 'segmentCount', 'createdAt'
+          ]) &&
+          isValidVideoCreationLog(incoming()) &&
+          incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(logId) && request.auth.uid == userId;
+      }
+    }
+
+    // 2. Super Admin Anchor Collection (Never writable by regular users)
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && isValidId(adminUid) && (request.auth.uid == adminUid || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow create: if isSignedIn() &&
+        isValidId(adminUid) &&
+        request.auth.uid == adminUid &&
+        isOwnerVerifiedEmail() &&
+        incoming().uid == request.auth.uid &&
+        incoming().keys().hasAll(['uid', 'email', 'createdAt']) &&
+        incoming().keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        incoming().email == 'shahansh140@gmail.com' &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+      allow update, delete: if false;
+    }
+
+    // 3. Global App Configuration (Readable by signed-in users, writable ONLY by Super Admin)
+    match /app_config/{configId} {
+      allow get: if isSignedIn() && isValidId(configId);
+      allow list: if isSuperAdmin();
+      allow create: if isSuperAdmin() &&
+        isValidId(configId) &&
+        incoming().keys().hasAll([
+          'dailyRequestLimit', 'chatEnabled', 'voiceEnabled',
+          'imageGenEnabled', 'webSearchEnabled', 'videoGenEnabled',
+          'videoBackendUrl', 'maintenanceMessage', 'updatedBy', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'dailyRequestLimit', 'chatEnabled', 'voiceEnabled',
+          'imageGenEnabled', 'webSearchEnabled', 'videoGenEnabled',
+          'videoBackendUrl', 'maintenanceMessage', 'updatedBy', 'updatedAt'
+        ]) &&
+        isValidAppConfig(incoming()) &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+      allow update: if isSuperAdmin() &&
+        isValidId(configId) &&
+        isValidAppConfig(incoming()) &&
+        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'dailyRequestLimit', 'chatEnabled', 'voiceEnabled',
+          'imageGenEnabled', 'webSearchEnabled', 'videoGenEnabled',
+          'videoBackendUrl', 'maintenanceMessage', 'updatedBy', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // 4. System Error Logs (Append by authenticated user for own errors; read/delete ONLY by Super Admin)
+    match /system_errors/{errorId} {
+      allow get: if isSuperAdmin() && isValidId(errorId);
+      allow list: if isSuperAdmin();
+      allow create: if isSignedIn() &&
+        isValidId(errorId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'feature', 'message', 'createdAt']) &&
+        incoming().keys().hasOnly(['userId', 'feature', 'message', 'createdAt']) &&
+        isValidSystemError(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+      allow update: if false;
+      allow delete: if isSuperAdmin() && isValidId(errorId);
+    }
+
+    // 5. AI Request Telemetry Events (Append by authenticated user; read ONLY by Super Admin)
+    match /telemetry_events/{eventId} {
+      allow get: if isSuperAdmin() && isValidId(eventId);
+      allow list: if isSuperAdmin();
+      allow create: if isSignedIn() &&
+        isValidId(eventId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'feature', 'modelName', 'success', 'createdAt']) &&
+        incoming().keys().hasOnly(['userId', 'feature', 'modelName', 'success', 'createdAt']) &&
+        isValidTelemetryEvent(incoming()) &&
+        incoming().createdAt is timestamp && incoming().createdAt <= request.time;
+      allow update, delete: if false;
+    }
+  }
+}
